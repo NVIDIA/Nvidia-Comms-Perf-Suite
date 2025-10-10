@@ -1,0 +1,53 @@
+[project]
+name = "nvcomms-perf"
+dynamic = ["version"]
+description = "Nvidia Comms Perf Suite - Performance Tools for NVIDIA GPU Communications Libraries"
+readme = "README.md"
+authors = [
+    { name = "Xiakun Lu", email = "xiakunl@nvidia.com" },
+    { name = "Taru Doodi", email = "tdoodi@nvidia.com" },
+    { name = "Ben Williams", email = "bewilliams@nvidia.com" },
+]
+requires-python = ">=3.9"
+dependencies = [
+    "colorlog>=6.9.0",
+    "marshmallow-dataclass>=8.7.1",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",
+    "tomli>=2.0.1",
+    "jinja2>=3.1.2",
+    "pandas>=2.2.3",
+    "polars>=1.31.0",
+    "orjson>=3.11.1",
+    "openpyxl>=3.1.5",
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    "pydantic>=2.11.4",
+    "sqlmodel>=0.0.24",
+    "boto3>=1.38.36",
+    "psycopg[binary]>=3.2.9",
+    "numpy>=2.0.2",
+    "matplotlib>=3.9.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff", "pyright", "hatch", "twine"]
+docs = ["sphinx", "sphinx-rtd-theme"]
+
+[project.scripts]
+nvcomms-perf = "nvcomms_perf.__main__:app"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.version]
+source = "vcs"
+raw-options = { version_scheme = "post-release" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nvcomms_perf"]
+
+[tool.ruff]
+line-length = 120

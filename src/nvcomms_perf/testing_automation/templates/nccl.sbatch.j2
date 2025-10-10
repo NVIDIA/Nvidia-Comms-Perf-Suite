@@ -1,0 +1,81 @@
+{#
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+#
+# See LICENSE.txt for license information
+#}
+
+{% extends "base.sbatch.j2" %}
+
+{% block validation_function %}
+    # Check for libcudart.so and libnccl.so in common library paths
+    cudart_found=0
+    nccl_found=0
+    
+    for path in ${LD_LIBRARY_PATH//:/ } /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu; do
+        if [ -d "$path" ] && [ -f "$path/libcudart.so" ]; then
+            echo "Found libcudart.so in: $path"
+            cudart_found=1
+            break
+        fi
+    done
+    for path in ${LD_LIBRARY_PATH//:/ } /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu; do
+        if [ -d "$path" ] && [ -f "$path/libnccl.so" ]; then
+            echo "Found libnccl.so in: $path"
+            nccl_found=1
+            break
+        fi
+    done
+
+    # If both libraries are found in paths, return success
+    if [ $cudart_found -eq 1 ] && [ $nccl_found -eq 1 ]; then
+        return 0
+    fi
+
+    # Check ldconfig cache for missing libraries
+    if [ $cudart_found -eq 0 ]; then
+        cudart_cache=$(ldconfig -p | grep -oP 'libcudart\.so[^\s]*' | head -1)
+        if [ -n "$cudart_cache" ]; then
+            echo "Found libcudart.so in ldconfig: $cudart_cache"
+            cudart_found=1
+        fi
+    fi
+    
+    if [ $nccl_found -eq 0 ]; then
+        nccl_cache=$(ldconfig -p | grep -oP 'libnccl\.so[^\s]*' | head -1)
+        if [ -n "$nccl_cache" ]; then
+            echo "Found libnccl.so in ldconfig: $nccl_cache"
+            nccl_found=1
+        fi
+    fi
+
+    # Return success if both libraries are found (either in paths or ldconfig)
+    if [ $cudart_found -eq 1 ] && [ $nccl_found -eq 1 ]; then
+        return 0
+    else
+        [ $cudart_found -eq 0 ] && echo "Error: libcudart.so not found"
+        [ $nccl_found -eq 0 ] && echo "Error: libnccl.so not found"
+        return 1
+    fi
+{% endblock %}
+
+{% block library_testset_metadata %}
+    for path in ${LD_LIBRARY_PATH//:/ } /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu; do
+        [ -d "$path" ] && [ -f "$path/libnccl.so" ] && { libary_path="${path}/libnccl.so"; break; }
+    done
+
+    if [ -z "$libary_path" ]; then
+        ldcache=$(ldconfig -p | awk -F' => ' '/libnccl\.so/ {print $2}' | head -1)
+        [ -n "$ldcache" ] && { libary_path=$ldcache; }
+    fi
+
+    libary_version=$(strings $libary_path | grep -oP '(?<=NCCL version )[^ ]+(?= compiled with)')
+    cuda_build_version=$(strings $libary_path | awk '/compiled with CUDA/ {print $NF}')
+
+{% endblock %}
+
+{% block env_var_adjustments %}
+        # Override NCCL_DEBUG_FILE if it is set, substitute the path with the rank_dir
+        if [ -n "$NCCL_DEBUG_FILE" ]; then
+            export NCCL_DEBUG_FILE="${rank_dir}/${NCCL_DEBUG_FILE##*/}"
+        fi
+{% endblock %}

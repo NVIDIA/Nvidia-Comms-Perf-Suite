@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+
+# NCCL Test Configuration
+description = "split_mask_sweep"
+library_name = "nccl"
+
+[common]
+path = "${NCCL_TEST_PATH}"
+
+[common.sweep_envs]
+NCCL_DEBUG = "WARN"
+NCCL_DEBUG_FILE = "nccl_debug_file.%h.%p.txt"
+NCCL_TESTS_SPLIT_MASK = ["0x0", "0x1", "0x3", "0x7"]
+
+[common.sweep_args]
+-t = 1
+-g = 1
+-f = 2
+-n = 20
+-w = 5
+-b = "8"
+-e = "16G"
+-d = "float"
+-R = 0
+
+# Define test configurations for each collective
+[[test]]
+name = "all_reduce"
+binary = "all_reduce_perf"
+
+[[test]]
+name = "all_gather"
+binary = "all_gather_perf"
+
+[[test]]
+name = "reduce_scatter"
+binary = "reduce_scatter_perf"
+
+[[test]]
+name = "alltoall"
+binary = "alltoall_perf"
+[test.sweep_args]
+-d = "uint8"
+
+[[test]]
+name = "sendrecv"
+binary = "sendrecv_perf"
+[test.sweep_args]
+-d = "uint8"

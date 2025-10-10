@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+
+# All the information that the users provide
+# each config must be "name = value", they will be exported in the generated script
+# there are four levels of configuration: global/system/run_env/library
+# the precedence is: library > run_env > system > global
+# if the same key is defined in different levels, the highest precedence level will be used
+# the special key "sbatch" is used to define sbatch directives, it must be a list of strings
+# the list of "sbatch" in different levels will be merged in order of precedence
+# the special key "pyxis" is used to define pyxis arguments, it must be a list of strings
+# the list of "pyxis" in different levels will be merged in order of precedence
+# the special key "prologue_commands" is used to define commands to be executed before tests
+# the special key "epilogue_commands" is used to define commands to be executed after tests
+# both prologue_commands and epilogue_commands are strings and follow normal precedence rules
+
+CUDA_HOME = "/path/to/your/cuda"
+LD_LIBRARY_PATH = "${CUDA_HOME}/lib64:${CUDA_HOME}/lib${LD_LIBRARY_PATH:+:LD_LIBRARY_PATH}"
+
+[CLUSTER_1]
+CUDA_HOME = "/CLUSTER_1/path/to/your/cuda"
+
+[CLUSTER_1.baremetal]
+[CLUSTER_1.baremetal.nccl]
+NCCL_HOME = "/CLUSTER_1/baremetal/path/to/your/nccl"
+NCCL_TEST_PATH = "/CLUSTER_1/baremetal/path/to/your/nccl-tests"
+MPI_HOME = "/CLUSTER_1/baremetal/path/to/your/openmpi"
+HPCX_HOME = "/CLUSTER_1/baremetal/path/to/your/hpcx"
+sbatch = [
+    "--gres=gpu:8",
+    "--ntasks-per-node=8"
+]
+prologue_commands = '''
+source $HPCX_HOME/hpcx-init.sh
+hpcx_load
+'''
+epilogue_commands = '''
+hpcx_unload
+'''
+
+[CLUSTER_1.container]
+[CLUSTER_1.container.nccl]
+NCCL_HOME = "/CLUSTER_1/container/path/to/your/nccl"
+NCCL_TEST_PATH = "/CLUSTER_1/container/path/to/your/nccl-tests"
+LD_LIBRARY_PATH = '''${NCCL_HOME}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}'''
+pyxis = [
+    "--container-image=/CLUSTER_1/container/path/to/your/nccl_container",
+    "--container-mounts=${LOG_DIR}:${LOG_DIR},${LOG_DIR}_DBG:${LOG_DIR}_DBG"
+]

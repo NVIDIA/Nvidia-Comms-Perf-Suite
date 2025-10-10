@@ -1,0 +1,251 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+
+# =============================================================================
+# Communication Library Performance Analysis Style Configuration
+# =============================================================================
+
+[figure_sizes]
+default = [15, 10]    # Default figure size in inches (width, height)
+dual_plot = [18, 8]   # Dual plot figure size
+subplot = [18, 12]    # Subplot figure size
+
+[chart_style]
+font_size = 11
+line_width = 2.2
+thick_line_width = 3.0
+marker_size = 5
+markeredgewidth = 0.8
+markeredgecolor = "white"
+background_color = "#ffffff"
+text_color = "#333333"
+axes_facecolor = "#ffffff"
+axes_edgecolor = "#333333"
+axes_labelcolor = "#333333"
+axes_spines_top = false
+axes_spines_right = false
+xtick_color = "#333333"
+ytick_color = "#333333"
+# Enhanced background options
+background_gradient = false
+background_gradient_alpha = 0.05
+background_pattern = "none"  # none, dots, lines
+
+[legend]
+show = true
+position = "lower center"
+columns = 3
+alpha = 0.95
+shadow = true
+framealpha = 0.95
+edgecolor = "#e0e0e0"
+fancybox = true
+fontsize = 9
+
+[grid]
+show = true
+alpha = 0.2
+color = "#666666"
+style = "solid"
+minor_alpha = 0.1
+minor_x_axis = true
+minor_y_axis = true
+# Enhanced grid options
+major_linewidth = 0.8
+minor_linewidth = 0.4
+major_style = "solid"
+minor_style = "dashed"  # Different style for minor gridlines
+major_color = "#666666"
+minor_color = "#999999"
+
+[annotations]
+show_final_bw = true
+fontsize = 9
+fontweight = "bold"
+zorder = 5
+bbox_boxstyle = "round,pad=0.4"
+bbox_facecolor = "white"
+bbox_alpha = 0.92
+bbox_edgecolor = "#e0e0e0"
+bbox_linewidth = 1
+
+
+[color_scheme]
+baseline = "black"
+fallback = "black"
+comparison = "blue"
+palette = "tab20"
+
+# Font size adjustments (relative to base font_size)
+[font_adjustments]
+title_large = 5        # For main titles and notes (+5)
+title_medium = 3       # For chart titles (+3)
+label_large = 1        # For axis labels (+1)
+label_small = -1       # For tick labels and some text (-1)
+table_header = -2      # For table headers (-2)
+
+# Plot positioning and spacing
+[plot_layout]
+subplot_left = 0.12
+subplot_right = 0.95
+subplot_top = 0.85
+subplot_bottom = 0.1
+axis_label_pad = 10
+title_pad = 20
+
+# Annotation positioning
+[annotation_positioning]
+text_offset_x = 7
+text_offset_y = 7
+shadow_offset_x = 1
+shadow_offset_y = -1
+shadow_alpha = 0.2
+
+# Grid line properties
+[grid_lines]
+major_linewidth = 0.8
+minor_linewidth = 0.4
+note_page_linewidth = 0.3
+
+# Tick parameters
+[ticks]
+minor_length = 3
+minor_width = 0.5
+major_length = 5
+major_width = 0.8
+# Enhanced tick options
+minor_color = "#999999"
+major_color = "#333333"
+tick_direction = "out"
+minor_alpha = 0.7
+major_alpha = 1.0
+
+# Legend positioning and spacing
+[legend_positioning]
+anchor_x = 0.5
+anchor_y_offset = -0.15
+height_per_row = 0.03
+bottom_margin_base = 0.2
+max_legend_height = 0.25  # Maximum fraction of figure height for legend (25%)
+adaptive_columns = false# Use more columns for large legends
+adaptive_font_size = true # Use smaller font for large legends
+
+# Background effects
+[background_effects]
+gradient_alpha = 0.05
+intro_text_alpha = 0.8
+intro_text_padding = 1
+
+# Page layout for command mapping and notes
+[page_layout]
+command_start_y = 0.85
+command_step_y = 0.055
+command_line_spacing = 0.027
+note_grid_start = 5
+note_grid_end = 95
+note_grid_step = 5
+
+# Text wrapping limits
+[text_wrapping]
+command_max_length = 130
+config_name_max_length = 10
+command_break_threshold = 20
+title_max_length = 100  # Maximum characters per line for chart titles
+title_max_lines = 5    # Maximum number of lines for chart titles
+# Table header wrapping configuration
+table_header_min_wrap_length = 20  # Minimum characters before forcing wrap
+table_header_max_wrap_length = 50  # Maximum characters per line for table headers
+table_header_wrap_threshold = 20   # Only wrap headers longer than this
+
+# Title style guidelines for consistent formatting across all titles
+[title_style]
+font_weight = "normal"           # Font weight: normal, bold, light
+font_size_adjustment = 3         # Font size adjustment relative to base font_size
+max_length = 100                 # Maximum characters per line before wrapping
+max_lines = 5                    # Maximum number of lines for wrapped titles
+wrap_enabled = true              # Whether to enable title wrapping
+alignment = "center"             # Text alignment: left, center, right
+vertical_alignment = "top"       # Vertical alignment: top, center, bottom
+color = "#333333"                # Title color
+line_spacing = 1.2               # Line spacing for multi-line titles
+
+# Table layout
+[table_layout]
+bbox_left = 0.05
+bbox_bottom = 0.1
+bbox_width = 0.9
+bbox_height = 0.75
+scale_width = 1
+scale_height = 10.0
+
+# Text positioning (as fractions of axes)
+[text_positioning]
+title_x = 0.5
+title_y = 0.95
+intro_text_x = 0.05
+intro_text_y = 0.95
+note_bottom_x = 0.5
+note_bottom_y = 0.05
+
+# Color palette
+[color_palette]
+num_colors = 20
+
+# =============================================================================
+# PDF Page Size and Layout Configuration
+# =============================================================================
+
+[pdf_settings]
+# PDF page orientation - set to true for landscape mode
+use_landscape = true
+
+# PDF page size (in inches) - standard US Letter
+page_width = 11.0
+page_height = 14.0
+
+# Margins for consistent spacing (in inches)
+margin_left = 0.5
+margin_right = 0.5
+margin_top = 1.0
+margin_bottom = 1.0
+
+# Figure size calculations (automatically computed in StyleManager based on orientation and margins)
+# No need to specify these here - they will be computed dynamically
+
+# PDF-specific subplot adjustments (tighter than regular plots)
+pdf_subplot_left = 0.08
+pdf_subplot_right = 0.95
+pdf_subplot_top = 0.85  # Leave more space for titles (15% instead of 8%)
+pdf_subplot_bottom = 0.08
+
+# PDF savefig parameters for consistent output
+pdf_dpi = 300
+pdf_facecolor = "white"
+pdf_edgecolor = "none"
+# pdf_bbox_inches is not specified - will default to None in code for consistent sizing

@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+
+[common]
+
+[common.run_params]
+sbatch = [
+    "--exclusive",
+    "--mem=0",
+    "--mail-type=FAIL",
+    "--output=%x_%j.out",
+    "--comment=sysctl-sys.kernel.numa_balancing=0,transparent_hugepage_defrag=never,transparent_hugepage=never"
+]
+
+srun = [
+    "-N ${SLURM_JOB_NUM_NODES}",
+    "--mpi=pmix"
+]
+
+openmpi = [
+    "-np ${LOG_NPS}",
+    "-N ${nps}",
+    "--map-by ppr:${nps}:node",
+    "--oversubscribe",
+    "--mca btl tcp,self",
+    "--mca btl_tcp_if_include $TCP_IF_INCLUDE",
+    "--mca coll_hcoll_enable 0",
+    "-x UCX_TLS=rc,sm",
+    "-x UCX_NET_DEVICES=$UCX_NET_DEVICE",
+    "--bind-to numa"
+]
+
+mpich = []
+
+# Define system-specific parameters
+# the list of one run_param will be merged with the list of the corresponding run_param in common
+# the duplicated element will be removed
+
+[CLUSTER_1]
+
+[CLUSTER_1.labels]
+name = "CLUSTER_1"
+network = "IB"
+switch = "Quantum2"
+nic = "CX7"
+gpu_type = "H100-DGX"
+
+[CLUSTER_1.run_params]
+sbatch = [
+    "--gres=gpu:8",
+    "--ntasks-per-node=8"
+]
+openmpi = [
+    "TCP_IF_INCLUDE=eth0",
+    "UCX_NET_DEVICE=mlx5_0:1"
+]
+nccl = [
+    "NCCL_IB_TIMEOUT=20",
+]

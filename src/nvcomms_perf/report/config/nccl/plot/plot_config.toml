@@ -1,0 +1,310 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+
+# =============================================================================
+# NCCL Performance Analysis Chart Configuration
+# =============================================================================
+
+[settings]
+
+[settings.x_axis]
+scale = "semilogx"
+
+ticks = [1024, 10240, 102400, 1048576, 10485760, 104857600, 1073741824, 10737418240, 107374182400]
+labels = ["1KB", "10KB", "100KB", "1MB", "10MB", "100MB", "1GB", "10GB", "100GB"]
+
+
+[settings.y_axis]
+[settings.y_axis.limits]
+# Y-axis limits configuration - all settings are optional
+# Maximum limits are automatically detected from the plotted data
+
+# Auto-detection settings (optional)
+auto_detect_margin = 0.1  # Add 10% margin above the maximum value (default: 0.1)
+auto_detect_round_to = 50  # Round up to nearest multiple (default: 50)
+
+# Manual override limits (optional)
+# These will be used instead of auto-detection if specified
+default_min = 0
+default_max = 50  # Only specify if you want to override auto-detection
+
+# P2P operation limits (optional)
+p2p_min = 0
+p2p_max = 50  # Only specify if you want to override auto-detection
+
+# Test binary specific limits (optional)
+[settings.y_axis.limits.test_binaries]
+alltoall_perf = { min = 0, max = 50 }  # Only specify if you want to override auto-detection
+sendrecv_perf = { min = 0, max = 50 }  # Only specify if you want to override auto-detection
+
+# Chart group ordering configuration
+[settings.chart_ordering]
+enable_sorting = true
+
+# Sort order for configurations
+[settings.chart_ordering.sort_order]
+num_nodes = true
+num_processes = true
+local_register = true
+NCCL_TESTS_SPLIT_MASK = true
+
+# Sort parameter mappings - how to resolve sort values from data
+[settings.chart_ordering.parameter_mappings]
+# Map sort parameter names to column names or special handling
+num_nodes = { column = "num_nodes", type = "numeric" }
+num_processes = { column = "num_processes", type = "numeric" }
+local_register = { column = "user_buffer_registration", type = "string", aliases = ["test_config.local_register", "ubr"] }
+NCCL_TESTS_SPLIT_MASK = { column = "NCCL_TESTS_SPLIT_MASK", type = "hex", extract_from_config_id = true }
+
+# Data processing settings
+[settings.data_processing]
+# Define which performance column to use by default
+default_performance_column = "max_bus_bw"
+size_column = "test_result.size"
+
+# Define multiple performance column types
+[settings.data_processing.performance_columns.max_bus_bw]
+sources = ["test_result.out_of_place.bus_bw", "test_result.in_place.bus_bw"]
+operation = "max"
+description = "Maximum bandwidth"
+default = true  # Mark as default performance column
+
+[settings.data_processing.performance_columns.min_latency]
+sources = ["test_result.out_of_place.time", "test_result.in_place.time"]
+operation = "min"
+description = "Minimum latency"
+
+[settings.data_processing.performance_columns.min_bus_bw]
+sources = ["test_result.out_of_place.bus_bw", "test_result.in_place.bus_bw"]
+operation = "min"
+description = "Minimum of bandwidths"
+
+# Column data types for optimization
+[settings.data_processing.dtypes]
+"test_result.size" = "int64"
+size = "int64"
+num_nodes = "int32"
+num_processes = "int32"
+user_buffer_registration = "int8"
+
+# Line and marker style mappings
+[settings.style_mappings]
+
+# Specify which column determines line and marker styles
+style_column = "local_register"
+
+# Line styles based on style_column values
+[settings.style_mappings.line_styles]
+# Text values (case-insensitive matching is handled in code)
+disabled = "-"                    # Solid line
+local_register_all = "--"         # Dashed line
+symmetric_register_all = ":"      # Dotted line
+# Numeric values (as strings since TOML keys must be strings)
+"0" = "-"                        # 0 -> solid
+"1" = "--"                       # 1 -> dashed
+"2" = ":"                        # 2 -> dotted
+
+# Marker styles based on style_column values
+[settings.style_mappings.marker_styles]
+# Text values (case-insensitive matching is handled in code)
+disabled = "o"                    # Circle
+local_register_all = "^"          # Triangle up
+symmetric_register_all = "x"      # X marker
+# Numeric values (as strings since TOML keys must be strings)
+"0" = "o"                        # 0 -> circle
+"1" = "^"                        # 1 -> triangle up
+"2" = "x"                        # 2 -> X
+
+# Color mappings for special configurations
+[settings.style_mappings.default_colors]
+"ALGO=DEFAULT_PROTO=DEFAULT_MIN_CTAS=DEFAULT" = "black"
+
+# -----------------------------------------------------------------------------
+# Chart Type Definitions (Test Binary Independent)
+# -----------------------------------------------------------------------------
+
+[[chart]]
+id = "default_comparison"
+name = "Default Configuration Comparison"
+description = "Compare performance with default algorithm and protocol settings"
+# Specify which performance columns to plot (if not specified, uses default_performance_column)
+performance_columns = ["max_bus_bw"]
+
+[chart.fixed_params]
+NCCL_ALGO = "DEFAULT"
+NCCL_PROTO = "DEFAULT"
+NCCL_MIN_CTAS = "DEFAULT"
+
+[chart.chart_split_params]
+num_nodes = "all"
+num_processes = "all"
+NCCL_TESTS_SPLIT_MASK= "all"
+
+[chart.chart_combine_params]
+local_register = "all"
+
+[[chart]]
+id = "algo_comparison"
+name = "Algorithm Comparison"
+description = "Compare performance of different NCCL algorithms"
+performance_columns = ["max_bus_bw"]
+
+[chart.fixed_params]
+NCCL_MIN_CTAS = "DEFAULT"
+
+[chart.chart_split_params]
+# Parameters where each unique combination gets its own chart
+num_nodes = "all"
+num_processes = "all"
+NCCL_TESTS_SPLIT_MASK = "all"
+
+[chart.chart_combine_params]
+# Parameters where all combinations appear within the same chart
+NCCL_ALGO = "all"
+NCCL_PROTO = "all"
+local_register = "all"
+
+[[chart]]
+id = "scale_comparison"
+name = "Scale Comparison"
+description = "Compare performance across different node and process counts"
+performance_columns = ["max_bus_bw"]
+
+[chart.fixed_params]
+NCCL_ALGO = "DEFAULT"
+NCCL_PROTO = "DEFAULT"
+NCCL_MIN_CTAS = "DEFAULT"
+
+[chart.chart_split_params]
+NCCL_TESTS_SPLIT_MASK = "all"
+
+[chart.chart_combine_params]
+num_nodes = "all"
+num_processes = "all"
+local_register = "all"
+
+[[chart]]
+id = "p2p_advanced"
+name = "Advanced P2P Comparison"
+description = "Compare performance with NCHANNELS and NET_PEERS settings"
+performance_columns = ["max_bus_bw"]
+
+[chart.fixed_params]
+
+[chart.chart_split_params]
+num_nodes = "all"
+num_processes = "all"
+NCCL_TESTS_SPLIT_MASK = "all"
+
+[chart.chart_combine_params]
+local_register = "all"
+NCCL_NCHANNELS_PER_NET_PEER = "all"
+NCCL_P2P_NET_CHUNKSIZE = "all"
+NCCL_IB_QPS_PER_CONNECTION = "all"
+
+# -----------------------------------------------------------------------------
+# Analysis Profile Definitions (Combining Chart Types with Test Binaries)
+# -----------------------------------------------------------------------------
+
+[[analysis_profiles]]
+id = "collective_basic"
+name = "Basic Collective Operations Analysis"
+description = "Basic analysis for collective operations"
+test_binaries = [
+    "all_reduce_perf",
+    "all_gather_perf",
+    "reduce_scatter_perf"
+]
+chart_types = [
+    "default_comparison",
+    "scale_comparison"
+]
+
+[[analysis_profiles]]
+id = "collective_advanced"
+name = "Advanced Collective Operations Analysis"
+description = "Detailed analysis including algorithm comparisons"
+test_binaries = [
+    "all_reduce_perf",
+    "all_gather_perf",
+    "reduce_scatter_perf"
+]
+chart_types = [
+    "default_comparison",
+    "scale_comparison",
+    "algo_comparison",
+]
+
+[[analysis_profiles]]
+id = "p2p_basic"
+name = "Basic P2P Operations Analysis"
+description = "Basic analysis for P2P operations"
+test_binaries = [
+    "sendrecv_perf",
+    "alltoall_perf"
+]
+chart_types = [
+    "default_comparison",
+    "scale_comparison"
+]
+
+[[analysis_profiles]]
+id = "p2p_advanced"
+name = "Advanced P2P Operations Analysis"
+description = "Detailed analysis including P2P-specific optimizations"
+test_binaries = [
+    "sendrecv_perf",
+    "alltoall_perf"
+]
+chart_types = [
+    "default_comparison",
+    "p2p_advanced"
+]
+
+# -----------------------------------------------------------------------------
+# PDF Report Configurations
+# -----------------------------------------------------------------------------
+
+[[pdf_configs]]
+id = "basic_report"
+name = "Basic Performance Analysis"
+description = "Basic analysis focusing on default configurations"
+analysis_profiles = [
+    "collective_basic",
+    "p2p_basic",
+]
+
+[[pdf_configs]]
+id = "comprehensive_report"
+name = "Comprehensive Performance Analysis"
+description = "Detailed analysis including algorithm comparisons"
+analysis_profiles = [
+    "collective_advanced",
+    "p2p_advanced",
+]

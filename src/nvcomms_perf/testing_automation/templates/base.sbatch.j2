@@ -1,0 +1,333 @@
+{#
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+#
+# See LICENSE.txt for license information
+#}
+
+{%- set env_prefix = "env" if launcher == "srun" else "-x" -%}
+{%- set launcher_params = system.launcher_params | join(" ") -%}
+{%- set pyxis_params = '' -%}
+{%- set workspace_in_container = '' -%}
+{%- if running_env == 'container' -%}
+    {%- set workspace_in_container = '/nvcomms-perf-workspace' -%}
+    {%- set new_pyxis_params = [] -%}
+    {%- set t_ns = namespace(mount_found = false) -%}
+
+    {%- for p in user.pyxis_params -%}
+        {%- if not t_ns.mount_found and '--container-mounts' in p -%}
+            {%- set _ = new_pyxis_params.append(p.rstrip(', ') ~ ',./:' ~ workspace_in_container) -%}
+            {%- set t_ns.mount_found = true -%}
+        {%- else -%}
+            {%- set _ = new_pyxis_params.append(p) -%}
+        {%- endif -%}
+    {%- endfor -%}
+
+    {%- if not t_ns.mount_found -%}
+        {%- set _ = new_pyxis_params.append('--container-mounts=./:' ~ workspace_in_container) -%}
+    {%- endif -%}
+
+    {%- set pyxis_params = new_pyxis_params | join(' ') -%}
+{%- endif -%}
+{%- set library_envs = (env_prefix + " " + system.library_envs | join(" " + env_prefix + " ")) if system.library_envs else "" -%}
+{%- set sweep_log_dir = "${SLURM_JOB_NAME}" + "_" + running_env + "-" + testset.library_name + "_${USER}" + "_${SLURM_JOBID}" -%}
+{%- set testset_log_dir = "LOG_$(date \"+%Y%m%d-%H%M\")_" + "${SLURM_JOBID}_" + system.system_name + "_sweep_N${SLURM_JOB_NUM_NODES}" -%}
+
+#!/bin/bash
+
+{% for directive in system.sbatch_directives %}
+#SBATCH {{ directive }}
+{% endfor %}
+{% for directive in user.sbatch_directives %}
+#SBATCH {{ directive }}
+{% endfor %}
+
+function validate_running_environment() {
+    :
+    {% if workspace_in_container != '' %}
+    cd {{ workspace_in_container }}
+    {% endif %}
+    {% block validation_function %}{% endblock %}
+}
+export -f validate_running_environment
+
+function get_nvl_domain_info() {
+    {% if workspace_in_container != '' %}
+    cd {{ workspace_in_container }}
+    {% endif %}
+    # Create a file per rank with NVLink domain information
+    local rank_id=0
+    if [ ! -z "$SLURM_PROCID" ]; then
+        rank_id=$SLURM_PROCID
+    elif [ ! -z "$OMPI_COMM_WORLD_RANK" ]; then
+        rank_id=$OMPI_COMM_WORLD_RANK
+    fi
+
+    mkdir -p $LOG_DIR/nvl_domain_info
+    nvidia-smi -q | grep -v GUID | grep -A4 Fabric > $LOG_DIR/nvl_domain_info/rank_${rank_id}.txt
+}
+export -f get_nvl_domain_info
+
+function collect_sweep_metadata() {
+    {% if workspace_in_container != '' %}
+    cd {{ workspace_in_container }}
+    {% endif %}
+    . /etc/os-release
+    hpcx_version=${HPCX_DIR##*/}
+
+    while IFS=: read -r key value; do
+        value=$(echo "$value" | xargs)
+        [ "$value" = "null" -o -z "$value" ] && echo "$key: $value" || echo "$key: \"$value\""
+    done <<EOF > $LOG_DIR/test_sweep_metadata.yml
+name: ${TESTS:-null}
+description: ${DESCRIPTION:-No description}
+raw_data_path: ${LOG_DIR:-null}
+data_source: ${USER:-$(whoami)}
+data_reviewer: ${USER:-$(whoami)}
+cluster_name: ${SLURM_CLUSTER_NAME:-null}
+system_metadata:
+  system_name: ${SYS_INFO_GPU_TYPE:-unknown}_${SYS_INFO_NETWORK:-unknown}_${SYS_INFO_SWITCH:-unknown}_${SYS_INFO_NIC:-unknown}_${SYS_INFO_NAME:-unknown}
+  gpu_arch_type: $(nvidia-smi -q 2>/dev/null | grep "Product Name" | head -n1 | cut -d ":" -f2 || echo null)
+  cpu_model_name: $(lscpu 2>/dev/null | grep -oP "(?<=Model name:).+$" || echo null)
+  cpu_arch_type: $(lscpu 2>/dev/null | grep -oP "(?<=Architecture:).+$" || echo null)
+  cuda_driver_version: $(nvidia-smi 2>/dev/null | grep -oP "(?<=Driver Version: )[\d\.]+" || echo null)
+  mpi_type: $(mpirun --version 2>/dev/null | grep -i "open mpi" -q && echo openmpi || echo null)
+  mpi_version: $(mpirun --version 2>/dev/null | grep -oP "(?<=\(Open MPI\) )[^\s]+$" || echo null)
+  hpcx_version: ${hpcx_version:-null}
+  os_type: ${ID:-null}
+  os_version: ${VERSION:-null}
+  linux_kernel_version: $(uname -r)
+  adaptive_routing: null
+network_metadata:
+  nics: $(lspci 2>/dev/null | grep -E "Ethernet controller|Infiniband controller" | grep -v "BlueField" | awk -F": " '/Mellanox/ {found=1;print $NF;exit 0} END {if (!found) exit 1}' || echo null)
+  switch_type: ${SYS_INFO_SWITCH:-null}
+  switch_version: null
+  network_name: ${SYS_INFO_NETWORK:-null}
+  network_version: null
+  network_plugin_name: null
+  network_plugin_version: null
+  mofed_version: $(command -v ofed_info >/dev/null && ofed_info -s 2>/dev/null | sed 's/:$//' || echo null)
+  libfabric_version: $(command -v fi_info >/dev/null && fi_info --version 2>/dev/null | grep "Libfabric" | awk '{print $2}' || echo null)
+EOF
+}
+export -f collect_sweep_metadata
+
+function collect_test_set_metadata() {
+    {% if workspace_in_container != '' %}
+    cd {{ workspace_in_container }}
+    {% endif %}
+    {% block library_testset_metadata %}{% endblock %}
+
+    while IFS=: read -r key value; do
+        value=$(echo "$value" | xargs)
+        [ "$value" = "null" -o -z "$value" ] && echo "$key: $value" || echo "$key: \"$value\""
+    done <<EOF > $LOG_DIR/test_set_metadata.yml
+timestamp: $(date +%s)
+description: {{ testset.description }}
+library:
+  name: {{ testset.library_name }}
+  path: ${libary_path:-null}
+  version: ${libary_version:-null}
+  commit_sha: ${library_commit_sha:-null}
+  cuda_build_version: ${cuda_build_version:-null}
+  cuda_runtime_version: $(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+(?=,)' || echo null)
+{% if system.library_envs %}
+env_variables:
+    {% for env in system.library_envs %}
+  {{ env | replace(" ", "") | replace("=", ": ") }}
+    {% endfor %}
+{% endif %}
+EOF
+}
+export -f collect_test_set_metadata
+
+function run_test() {
+    {% if workspace_in_container != '' %}
+    cd {{ workspace_in_container }}
+    {% endif %}
+    UNIQUE_NVL_DOMAINS=$(grep "ClusterUUID" $LOG_DIR/nvl_domain_info/rank_*.txt | awk '{print $NF}' | sort | uniq | wc -l || echo "null")
+    GPUS_PER_NVL_DOMAIN=$(grep "ClusterUUID" $LOG_DIR/nvl_domain_info/rank_*.txt | awk '{print $NF}' | sort | uniq -c | sort -nr | awk '{print $1}' | paste -sd "," - || echo "null")
+
+    test_iterations={{ testset.test_iterations }}
+    for iter in $(seq 1 ${test_iterations}); do
+        log_name="${STEP_NAME}_iter${iter}"
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+            while IFS=: read -r key value; do
+            value=$(echo "$value" | xargs)
+            [ "$value" = "null" -o -z "$value" ] && echo "$key: $value" || echo "$key: \"$value\""
+        done <<EOF > $LOG_DIR/${log_name}.yml
+test_name: ${TEST_NAME:-null}
+log_name: ${log_name}.txt
+timestamp: $(date +%s)
+hostname: ${HOSTNAME:-$(hostname)}
+container: $(echo "$TEST_CMD" | grep -oP -- '--container-image(?:=|\s+)\K\S+' || echo null)
+num_nodes: ${SLURM_NNODES}
+num_processes: ${SLURM_NTASKS}
+num_process_per_node: ${SLURM_NTASKS_PER_NODE:-$((SLURM_NTASKS / (SLURM_NNODES ? SLURM_NNODES : 1)))}
+unique_nvl_domains: ${UNIQUE_NVL_DOMAINS:-null}
+num_gpus_per_nvl_domain: ${GPUS_PER_NVL_DOMAIN:-null}
+slurm_id: ${SLURM_JOB_ID:-0}
+slurm_job_name: ${SLURM_JOB_NAME:-null}
+node_list: ${SLURM_JOB_NODELIST:-null}
+test_binary: ${1##*/}
+default_config: ${USE_DEFAULT_PARAM:-0}
+iteration: $(((TESTSET_ITERATION - 1) * test_iterations + iter ))
+cmd: "$TEST_CMD"
+EOF
+        fi
+
+        log_file=${LOG_DIR}/${log_name}.txt
+        rank_dir=${LOG_DIR}/${log_name}/rank${SLURM_PROCID}_$(hostname -s)
+        rank_log_file=${rank_dir}/stdout.txt
+        rank_err_file=${rank_dir}/stderr.txt
+
+        mkdir -p $rank_dir
+
+        {% block env_var_adjustments %}{% endblock %}
+
+        # Don't use `cp ${rank_log_file} ${log_file}` on rank 0, because when cp is called,
+        # file ${rank_log_file} might not exist yet due to disk cache or shared file system.
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+            "$@" 2>${rank_err_file} | tee ${rank_log_file} | tee ${log_file}
+        else
+            "$@" 2>${rank_err_file} | tee ${rank_log_file}
+        fi
+        if [ $? -ne 0 ]; then
+            echo "Error: Test ${TEST_NAME} failed, see ${rank_err_file} for details" >&2
+            return $?
+        fi
+    done
+
+    return 0
+}
+export -f run_test
+
+
+WORKSPACE=${NVCOMMS_PERF_TOOLS_WORKSPACE:-.}
+cd ${WORKSPACE}
+
+export SWEEP_LOG_DIR="{{ sweep_log_dir }}"
+export TESTSET_LOG_DIR="{{ testset_log_dir }}"
+export LOG_DIR="${SWEEP_LOG_DIR}"/"${TESTSET_LOG_DIR}"
+mkdir -p "$LOG_DIR"
+
+# System Environment Setup
+{% for k, v in system.labels.items() %}
+export SYS_INFO_{{ k | upper }}="{{ v }}"
+{% endfor %}
+
+# User Environment Setup
+{% for k, v in user.env_vars.items() %}
+export {{ k }}="{{ v }}"
+{% endfor %}
+
+{% if user.prologue_commands %}
+# User Prologue Commands
+{{ user.prologue_commands }}
+{% endif %}
+
+{% if launcher == "srun" %}
+{{ [launcher, "--ntasks=$SLURM_JOB_NUM_NODES --ntasks-per-node=1", pyxis_params] | reject('equalto', '') | join(" ") }} bash -c "get_nvl_domain_info"
+{{ [launcher, "--ntasks=1 --nodes=1", pyxis_params] | reject('equalto', '') | join(" ") }} bash -c "validate_running_environment && collect_sweep_metadata && collect_test_set_metadata"
+{% elif launcher == "mpirun" %}
+{{ [launcher, "-np $SLURM_JOB_NUM_NODES --map-by ppr:1:node", pyxis_params] | reject('equalto', '') | join(" ") }} bash -c "get_nvl_domain_info"
+{{ [launcher, "-np 1 --map-by ppr:1:node", pyxis_params] | reject('equalto', '') | join(" ") }} bash -c "validate_running_environment && collect_sweep_metadata && collect_test_set_metadata"
+{% endif %}
+[ $? -ne 0 ] && { echo "Error: Failed to validate running environment"; exit 1; }
+
+export MAX_GPUS_IN_NVL_DOMAIN=$(grep "ClusterUUID" $LOG_DIR/nvl_domain_info/rank_*.txt | awk '{print $NF}' | sort | uniq -c | sort -nr | awk '{print $1}' | head -n1 || echo "null")
+
+testset_iterations={{ testset.testset_iterations }}
+
+for testset_iter in $(seq 1 ${testset_iterations}); do
+{% set ns = namespace(global_index=0, total_tests=0) %}
+{% for test in testset.tests %}
+    {% set ns.total_tests = ns.total_tests + test.combinations | length %}
+{% endfor %}
+{% for test in testset.tests %}
+    {% for combination in test.combinations %}
+        {% set ns.global_index = ns.global_index + 1 %}
+        {% set combination_envs %}{% for k, v in combination.env.items() %}{{ env_prefix }} {{ k }}="{{ v }}"{% if not loop.last %} {% endif %}{% endfor %}{% endset %}
+        {% set combination_args %}{% for k, v in combination.arg.items() %}{{ k }}{{ v }}{% if not loop.last %} {% endif %}{% endfor %}{% endset %}
+        {% set pre_cmd %}{% if combination.custom_commands.pre_command is defined %}{{ combination.custom_commands.pre_command }}{% endif %}{% endset %}
+        {% set post_cmd %}{% if combination.custom_commands.post_command is defined %}{{ combination.custom_commands.post_command }}{% endif %}{% endset %}
+        {% set test_cmd %}{{ [launcher, launcher_params, pyxis_params, library_envs, combination_envs] | reject('equalto', '') | join(" ") }} bash -c '{% if pre_cmd %}{{ pre_cmd }}; {% endif %}{{ ["run_test", test.binary + "${NVCOMMS_PERF_TOOLS_BINARY_SUFFIX}", combination_args] | reject('equalto', '') | join(" ") }}{% if post_cmd %}; {{ post_cmd }}{% endif %}'{% endset %}
+    echo "[${testset_iter}/${testset_iterations}] Running test {{ ns.global_index }}/{{ ns.total_tests }}"
+    export TEST_NAME={{ test.name }} TESTSET_ITERATION=${testset_iter} USE_DEFAULT_PARAM={{ 1 if testset.use_default_params else 0 }}
+    export STEP_NAME="${TESTSET_ITERATION}_{{ns.global_index}}_LOG_${TEST_NAME}_env{{ combination.env_combo_index }}_args{{ combination.arg_combo_index }}_job${SLURM_JOB_ID}"
+    export TEST_CMD=$(echo {{ test_cmd }})
+
+    mkdir -p "${LOG_DIR}"/"${STEP_NAME}"
+    start_time=$(date +%s.%N)
+    {{ test_cmd }} > >(tee "${LOG_DIR}"/"${STEP_NAME}"/job_step_stdout.txt) 2> >(tee "${LOG_DIR}"/"${STEP_NAME}"/job_step_stderr.txt)
+    ret_code=$?
+    end_time=$(date +%s.%N)
+
+    cat > "${LOG_DIR}"/"${STEP_NAME}"/result.txt << EOF
+test_name="${TEST_NAME}"
+test_command="${TEST_CMD}"
+# Parameter combination string that will be used on this test run (envs | args | commands)
+combination="{{combination_envs}} | {{combination_args}}{% if pre_cmd %} | pre:{{ pre_cmd }}{% endif %}{% if post_cmd %} | post:{{ post_cmd }}{% endif %}"
+ret_code="${ret_code}"
+elapsed=$(echo "$end_time - $start_time" | bc)
+EOF
+
+    {% endfor %}
+{% endfor %}
+done
+
+# Cleanup and completion
+echo "All tests completed successfully"
+
+{% if user.epilogue_commands %}
+# User Epilogue Commands
+{{ user.epilogue_commands }}
+{% endif %}
+
+{% if generate_junit_report %}
+# Generate JUNIT report
+junit_xml="${SWEEP_LOG_DIR}"/junit_report.xml
+echo '<testsuites>' > "$junit_xml"
+echo "  <testsuite name=\"nvcomms-perf\">" >> "$junit_xml"
+for step_dir in $(ls -v -d "${LOG_DIR}"/*_LOG_*_env*_args*_job${SLURM_JOB_ID}); do
+    (
+        source "$step_dir"/result.txt
+        echo "    <testcase classname=\"${test_name}\" name=\"$combination\" time=\"$elapsed\">" >> "$junit_xml"
+        if [ "$ret_code" != "0" ]; then
+            echo "      <failure message=\"Test failed with return code $ret_code\">" >> "$junit_xml"
+            echo "        Command: $test_command" >> "$junit_xml"
+            echo "      </failure>" >> "$junit_xml"
+            echo "      <system-err>$(cat "${step_dir}"/job_step_stderr.txt)</system-err>" >> "$junit_xml"
+            echo "      <system-out>$(cat "${step_dir}"/job_step_stdout.txt)</system-out>" >> "$junit_xml"
+        fi
+        echo "    </testcase>" >> "$junit_xml"
+    )
+done
+echo '  </testsuite>' >> "$junit_xml"
+echo '</testsuites>' >> "$junit_xml"
+{% endif %}
+
+# Archive the log directory
+echo "Archiving log directory"
+cp $0 ${SWEEP_LOG_DIR}/
+tar -czf ${SWEEP_LOG_DIR}.tar.gz ${SWEEP_LOG_DIR}
+
+echo "All done"
+
+exit 0
+
+{% if append_config_contents %}
+########## Configurations ##########
+--system={{ arg_system }} --run-type={{ arg_run_type }} --script_type={{ arg_script_type }}
+
+----- BEGIN SYSTEM CONFIGURATION FILE -----
+{{ systems_toml_content }}
+----- END SYSTEM CONFIGURATION FILE -----
+
+----- BEGIN USER CONFIGURATION FILE -----
+{{ user_toml_content }}
+----- END USER CONFIGURATION FILE -----
+
+----- BEGIN TESTSET CONFIGURATION FILE -----
+{{ testset_toml_content }}
+----- END TESTSET CONFIGURATION FILE -----
+{% endif %}
