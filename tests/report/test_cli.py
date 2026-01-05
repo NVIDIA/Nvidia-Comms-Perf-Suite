@@ -207,6 +207,17 @@ class TestCLIBasics:
             # OutputFile might not be available in all versions
             pytest.skip("OutputFile not available in this version")
 
+    def test_input_file_parsing_tar_gz(self, tmp_path):
+        """Test InputFile inference for tarballs with multi-part extensions (e.g. .tar.gz)."""
+        from nvcomms_perf.report.cli.common import InputFile, InputFileType
+
+        tarball = tmp_path / "bia_baremetal-nccl_user_12345.tar.gz"
+        tarball.write_bytes(b"not a real tarball, extension inference only")
+
+        inp = InputFile(str(tarball))
+        assert inp.type == InputFileType.TARBALL
+        assert inp.path == tarball
+
 
 # ============================================================================
 # Report Generation Tests

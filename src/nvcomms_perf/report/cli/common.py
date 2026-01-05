@@ -63,12 +63,18 @@ class InputFile:
         else:
             # Infer type from extension
             path = value
-            ext = Path(path).suffix.lower()
-            if ext == ".csv":
+            path_obj = Path(path)
+            name_lower = path_obj.name.lower()
+
+            # NOTE: Path(...).suffix only returns the last suffix (e.g. ".gz"),
+            # so it cannot correctly infer types for multi-part extensions like
+            # ".tar.gz". Infer using the filename ending instead.
+            if name_lower.endswith(".csv"):
                 self.type = InputFileType.CSV
-            elif ext in [".tar", ".tar.gz", ".tgz", ".tar.bz2"]:
+            elif name_lower.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2")):
                 self.type = InputFileType.TARBALL
             else:
+                ext = "".join([s.lower() for s in path_obj.suffixes]) or path_obj.suffix.lower()
                 raise typer.BadParameter(
                     f"Cannot infer input file type from extension '{ext}'. "
                     f"Supported file types: CSV (.csv) and tarballs (.tar, .tar.gz, .tgz, .tar.bz2). "

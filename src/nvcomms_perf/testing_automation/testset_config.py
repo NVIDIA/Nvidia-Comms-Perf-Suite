@@ -260,7 +260,7 @@ class TestsetConfig:
             for combo in combinations:
                 new_combo = {}
                 for key, value in combo.items():
-                    if value.lower() == "default":
+                    if str(value).lower() == "default":
                         new_combo["x" + key] = value.lower()
                     else:
                         new_combo[key] = value

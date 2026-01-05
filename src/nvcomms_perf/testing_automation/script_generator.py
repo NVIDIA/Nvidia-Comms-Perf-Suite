@@ -154,6 +154,11 @@ def generate_job_script(systems_toml: str, user_toml: str, testset_toml: str, sy
         testset_toml_content=testset_toml
     )
 
+    # Some templates may accidentally emit a leading blank line (e.g., from Jinja
+    # whitespace around comments/blocks). Strip only leading newlines so scripts
+    # start immediately at the shebang / first directive.
+    script = script.lstrip("\n")
+
     logger.info("Job script generation completed")
 
     return script
