@@ -41,8 +41,24 @@ logger = logging.getLogger(__name__)
 
 def generate_job_script_cmd(
     system: Annotated[str, typer.Option(help="System name (e.g., CLUSTER_1, CLUSTER_2)", show_default=False)],
-    systems_toml: Annotated[Path, typer.Option(..., help="Path to systems TOML file", show_default=False, exists=True, file_okay=True, dir_okay=False, readable=True)],
-    user_toml: Annotated[Path, typer.Option(..., help="Path to user TOML file", show_default=False, exists=True, file_okay=True, dir_okay=False, readable=True)],
+    systems_toml: Annotated[Path, typer.Option(
+        help="Path to systems/clusters TOML file",
+        show_default=False,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        envvar="NVCOMMS_PERF_SYSTEMS_TOML",
+    )],
+    user_toml: Annotated[Path, typer.Option(
+        help="Path to user TOML file",
+        show_default=False,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        envvar="NVCOMMS_PERF_USER_TOML",
+    )],
     testset_toml: Annotated[Path, typer.Option(..., help="Path to testset TOML file", show_default=False, exists=True, file_okay=True, dir_okay=False, readable=True)],
     run_type: Annotated[RunType, typer.Option(help="Run type", show_default=True, show_choices=True)] = RunType.SRUN,
     script_type: Annotated[ScriptType, typer.Option(help="Type of job script to generate", show_default=True, show_choices=True)] = ScriptType.SBATCH,
@@ -63,7 +79,10 @@ def generate_job_script_cmd(
         logger.error(f"Error reading TOML files: {e}")
         raise typer.Exit(1)
 
-    script = generate_job_script(systems_toml_content, user_toml_content, testset_toml_content, system, run_type, script_type, append_config_contents, generate_test_report or [])
+    # Use testset filename (without extension) as the default job name
+    testset_name = testset_toml.stem
+
+    script = generate_job_script(systems_toml_content, user_toml_content, testset_toml_content, system, run_type, script_type, append_config_contents, generate_test_report or [], testset_name)
 
     if output == Path("-"):
         print(script)

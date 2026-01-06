@@ -58,7 +58,7 @@ class TestReportType(str, Enum):
     """Enum for different test report types."""
     JUNIT = "junit"
 
-def generate_job_script(systems_toml: str, user_toml: str, testset_toml: str, system_name: str, run_type: RunType, script_type: ScriptType, append_config_contents: bool = False, generate_test_report: List[TestReportType] = []) -> str:
+def generate_job_script(systems_toml: str, user_toml: str, testset_toml: str, system_name: str, run_type: RunType, script_type: ScriptType, append_config_contents: bool = False, generate_test_report: List[TestReportType] = [], testset_name: str = "") -> str:
     try:
         testset_config = tomli.loads(testset_toml)
     except tomli.TOMLDecodeError as e:
@@ -105,11 +105,13 @@ def generate_job_script(systems_toml: str, user_toml: str, testset_toml: str, sy
             "epilogue_commands": user_config.get_epilogue_commands
         }
         testset = {
+            "name": testset_name,
             "description": testset_config.description,
             "library_name": testset_config.library_name,
             "testset_iterations": testset_config.testset_iterations,
             "test_iterations": testset_config.test_iterations,
             "use_default_params": testset_config.use_default_params,
+            "sbatch_directives": testset_config.sbatch_directives,
             "tests": testset_config.get_tests()
         }
     elif script_type == "interactive":
