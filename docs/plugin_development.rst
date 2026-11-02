@@ -50,6 +50,10 @@ Quick Start
 
 Create a ``setup.py`` or ``pyproject.toml``:
 
+The packaging examples below assume the framework is already installed from a
+trusted checkout. Install that checkout explicitly before installing your plugin;
+these examples do not fetch the framework by package name.
+
 .. code-block:: python
 
     # setup.py
@@ -59,7 +63,7 @@ Create a ``setup.py`` or ``pyproject.toml``:
         name="nvcomms-perf-my-plugin",
         version="0.1.0",
         py_modules=["my_plugin"],
-        install_requires=["nvcomms-perf"],
+        install_requires=["typer"],
         entry_points={
             "nvcomms_perf": [
                 "my-plugin = my_plugin:MyPlugin",
@@ -78,7 +82,7 @@ Or with ``pyproject.toml``:
     [project]
     name = "nvcomms-perf-my-plugin"
     version = "0.1.0"
-    dependencies = ["nvcomms-perf"]
+    dependencies = ["typer"]
 
     [project.entry-points.nvcomms_perf]
     my-plugin = "my_plugin:MyPlugin"
@@ -88,8 +92,11 @@ Or with ``pyproject.toml``:
 
 .. code-block:: bash
 
-    # Install the plugin
-    pip install -e .
+    # Install the framework from your local checkout
+    python -m pip install -e /path/to/framework-checkout
+
+    # From your plugin directory, install the plugin
+    python -m pip install -e .
 
     # Use the plugin
     nvcomms-perf my-command
@@ -450,7 +457,9 @@ Examples
 See the examples directory in the nvcomms-perf repository for complete working examples:
 
 * ``examples/minimal_plugin.py``: Simplest possible plugin
-* ``examples/example_plugin/``: Full-featured plugin with packaging
+
+The separately packaged example plugin has been removed. Use the packaging
+instructions above to register your own plugin.
 
 Support
 =======

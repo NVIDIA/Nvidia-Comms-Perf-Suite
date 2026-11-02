@@ -395,7 +395,7 @@ Register the plugin via entry points:
 my-plugin = "my_plugin_module:MyPlugin"
 ```
 
-See the [example plugin](examples/example_plugin/) for a complete working example.
+See the [minimal plugin](examples/minimal_plugin.py) and [plugin development guide](docs/plugin_development.rst) for examples.
 
 ## Documentation
 
