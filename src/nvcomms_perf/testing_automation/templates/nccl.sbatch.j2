@@ -12,7 +12,7 @@
     nccl_found=0
     cudart_path=""
     nccl_path=""
-    
+
     for path in ${LD_LIBRARY_PATH//:/ } /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu; do
         if [ -d "$path" ] && [ -f "$path/libcudart.so" ]; then
             echo "Found libcudart.so in: $path"
@@ -44,7 +44,7 @@
             cudart_path="$cudart_cache"
         fi
     fi
-    
+
     if [ $nccl_found -eq 0 ]; then
         nccl_cache=$(ldconfig -p 2>/dev/null | grep -oP 'libnccl\.so[^\s]*' | head -1)
         if [ -n "$nccl_cache" ]; then
@@ -65,19 +65,19 @@
     echo "ERROR: Failed to validate running environment" >&2
     echo "================================================================================" >&2
     echo "" >&2
-    
+
     if [ $cudart_found -eq 0 ]; then
         echo "[MISSING] libcudart.so NOT FOUND" >&2
     else
         echo "[OK] libcudart.so found at: $cudart_path" >&2
     fi
-    
+
     if [ $nccl_found -eq 0 ]; then
         echo "[MISSING] libnccl.so NOT FOUND" >&2
     else
         echo "[OK] libnccl.so found at: $nccl_path" >&2
     fi
-    
+
     echo "" >&2
     echo "--- Environment Variables ---" >&2
     echo "CUDA_HOME:        ${CUDA_HOME:-<not set>}" >&2
@@ -126,7 +126,7 @@
     echo "  * Or source HPC-X: source \$HPCX_HOME/hpcx-init.sh && hpcx_load" >&2
     echo "" >&2
     echo "================================================================================" >&2
-    
+
     return 1
 {% endblock %}
 
