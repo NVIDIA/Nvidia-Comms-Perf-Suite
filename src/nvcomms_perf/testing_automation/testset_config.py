@@ -66,6 +66,7 @@ class TestsetConfig:
                 "use_default_params": config.get("use_default_params", 0),
                 "allowed_envs_to_sweep_on_default": config.get("allowed_envs_to_sweep_on_default", []),
                 "allowed_args_to_sweep_on_default": config.get("allowed_args_to_sweep_on_default", []),
+                "sbatch": config.get("sbatch", []),
                 "tests": []
             }
 
@@ -133,6 +134,11 @@ class TestsetConfig:
     def use_default_params(self) -> bool:
         """Get the use_default_params flag."""
         return self.config.get("use_default_params", 0)
+
+    @property
+    def sbatch_directives(self) -> List[str]:
+        """Get SBATCH directives from the testset configuration."""
+        return self.config.get("sbatch", [])
 
     def get_tests(self) -> List[Dict[str, Any]]:
         """Get the tests from the configuration.

@@ -10,6 +10,22 @@ Overview
 
 A framework for generating and running tests across different systems and configurations, supporting both baremetal and containerized environments.
 
+SBATCH defaults and configuration paths
+--------------------------------------
+
+SBATCH directives are read in system, user, then testset order. A testset can
+specify a top-level ``sbatch`` array, just like the user configuration. Each
+array entry contains one option and its optional argument, for example
+``"--account project"`` or ``"--account=project"``.
+
+Unless explicitly set, the job name is the testset filename without its
+extension. When an account is configured, missing output and error filenames
+default to ``<account>-%x-%j.out`` and ``<account>-%x-%j.err``. Explicit job names
+and log filenames are preserved.
+
+Set ``NVCOMMS_PERF_SYSTEMS_TOML`` and ``NVCOMMS_PERF_USER_TOML`` to provide default
+configuration paths. The corresponding command-line options take precedence.
+
 Quick Start
 -----------
 

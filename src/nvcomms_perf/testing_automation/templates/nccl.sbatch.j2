@@ -10,11 +10,14 @@
     # Check for libcudart.so and libnccl.so in common library paths
     cudart_found=0
     nccl_found=0
-    
+    cudart_path=""
+    nccl_path=""
+
     for path in ${LD_LIBRARY_PATH//:/ } /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu; do
         if [ -d "$path" ] && [ -f "$path/libcudart.so" ]; then
             echo "Found libcudart.so in: $path"
             cudart_found=1
+            cudart_path="$path/libcudart.so"
             break
         fi
     done
@@ -22,6 +25,7 @@
         if [ -d "$path" ] && [ -f "$path/libnccl.so" ]; then
             echo "Found libnccl.so in: $path"
             nccl_found=1
+            nccl_path="$path/libnccl.so"
             break
         fi
     done
@@ -33,29 +37,97 @@
 
     # Check ldconfig cache for missing libraries
     if [ $cudart_found -eq 0 ]; then
-        cudart_cache=$(ldconfig -p | grep -oP 'libcudart\.so[^\s]*' | head -1)
+        cudart_cache=$(ldconfig -p 2>/dev/null | grep -oP 'libcudart\.so[^\s]*' | head -1)
         if [ -n "$cudart_cache" ]; then
             echo "Found libcudart.so in ldconfig: $cudart_cache"
             cudart_found=1
+            cudart_path="$cudart_cache"
         fi
     fi
-    
+
     if [ $nccl_found -eq 0 ]; then
-        nccl_cache=$(ldconfig -p | grep -oP 'libnccl\.so[^\s]*' | head -1)
+        nccl_cache=$(ldconfig -p 2>/dev/null | grep -oP 'libnccl\.so[^\s]*' | head -1)
         if [ -n "$nccl_cache" ]; then
             echo "Found libnccl.so in ldconfig: $nccl_cache"
             nccl_found=1
+            nccl_path="$nccl_cache"
         fi
     fi
 
     # Return success if both libraries are found (either in paths or ldconfig)
     if [ $cudart_found -eq 1 ] && [ $nccl_found -eq 1 ]; then
         return 0
-    else
-        [ $cudart_found -eq 0 ] && echo "Error: libcudart.so not found"
-        [ $nccl_found -eq 0 ] && echo "Error: libnccl.so not found"
-        return 1
     fi
+
+    # Validation failed - print detailed debug information to stderr
+    echo "" >&2
+    echo "================================================================================" >&2
+    echo "ERROR: Failed to validate running environment" >&2
+    echo "================================================================================" >&2
+    echo "" >&2
+
+    if [ $cudart_found -eq 0 ]; then
+        echo "[MISSING] libcudart.so NOT FOUND" >&2
+    else
+        echo "[OK] libcudart.so found at: $cudart_path" >&2
+    fi
+
+    if [ $nccl_found -eq 0 ]; then
+        echo "[MISSING] libnccl.so NOT FOUND" >&2
+    else
+        echo "[OK] libnccl.so found at: $nccl_path" >&2
+    fi
+
+    echo "" >&2
+    echo "--- Environment Variables ---" >&2
+    echo "CUDA_HOME:        ${CUDA_HOME:-<not set>}" >&2
+    echo "NCCL_HOME:        ${NCCL_HOME:-<not set>}" >&2
+    echo "HPCX_HOME:        ${HPCX_HOME:-<not set>}" >&2
+    echo "NCCL_TEST_PATH:   ${NCCL_TEST_PATH:-<not set>}" >&2
+    echo "" >&2
+    echo "--- LD_LIBRARY_PATH ---" >&2
+    if [ -n "$LD_LIBRARY_PATH" ]; then
+        echo "$LD_LIBRARY_PATH" | tr ':' '\n' | while read -r p; do
+            if [ -d "$p" ]; then
+                echo "  [exists]     $p" >&2
+            else
+                echo "  [NOT FOUND]  $p" >&2
+            fi
+        done
+    else
+        echo "  <not set>" >&2
+    fi
+    echo "" >&2
+    echo "--- Paths Searched ---" >&2
+    for path in ${LD_LIBRARY_PATH//:/ } /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu; do
+        if [ -d "$path" ]; then
+            cudart_exists=$( [ -f "$path/libcudart.so" ] && echo "yes" || echo "no" )
+            nccl_exists=$( [ -f "$path/libnccl.so" ] && echo "yes" || echo "no" )
+            echo "  $path" >&2
+            echo "    libcudart.so: $cudart_exists | libnccl.so: $nccl_exists" >&2
+        fi
+    done
+    echo "" >&2
+    echo "--- ldconfig cache (CUDA/NCCL entries) ---" >&2
+    ldconfig -p 2>/dev/null | grep -E "libcudart|libnccl" | head -20 >&2 || echo "  <no entries found or ldconfig unavailable>" >&2
+    echo "" >&2
+    echo "--- Suggested Fixes ---" >&2
+    if [ $cudart_found -eq 0 ]; then
+        echo "  * Set CUDA_HOME and add to LD_LIBRARY_PATH:" >&2
+        echo "      export CUDA_HOME=/path/to/cuda" >&2
+        echo "      export LD_LIBRARY_PATH=\$CUDA_HOME/lib64:\$LD_LIBRARY_PATH" >&2
+    fi
+    if [ $nccl_found -eq 0 ]; then
+        echo "  * Set NCCL_HOME and add to LD_LIBRARY_PATH:" >&2
+        echo "      export NCCL_HOME=/path/to/nccl/build" >&2
+        echo "      export LD_LIBRARY_PATH=\$NCCL_HOME/lib:\$LD_LIBRARY_PATH" >&2
+    fi
+    echo "  * Or load the appropriate module (e.g., module load cuda nccl)" >&2
+    echo "  * Or source HPC-X: source \$HPCX_HOME/hpcx-init.sh && hpcx_load" >&2
+    echo "" >&2
+    echo "================================================================================" >&2
+
+    return 1
 {% endblock %}
 
 {% block library_testset_metadata %}

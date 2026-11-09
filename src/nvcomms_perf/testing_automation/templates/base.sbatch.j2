@@ -33,13 +33,11 @@
 {%- set testset_log_dir = "LOG_$(date \"+%Y%m%d-%H%M\")_" + "${SLURM_JOBID}_" + system.system_name + "_sweep_N${SLURM_JOB_NUM_NODES}" -%}
 
 #!/bin/bash
+{% for directive in sbatch_directives %}
+#SBATCH {{ directive }}
+{% endfor %}
 
-{% for directive in system.sbatch_directives %}
-#SBATCH {{ directive }}
-{% endfor %}
-{% for directive in user.sbatch_directives %}
-#SBATCH {{ directive }}
-{% endfor %}
+set -o pipefail
 
 function validate_running_environment() {
     :
@@ -188,12 +186,14 @@ EOF
         # file ${rank_log_file} might not exist yet due to disk cache or shared file system.
         if [ "$SLURM_PROCID" -eq 0 ]; then
             "$@" 2>${rank_err_file} | tee ${rank_log_file} | tee ${log_file}
+            test_exit_code=${PIPESTATUS[0]}
         else
             "$@" 2>${rank_err_file} | tee ${rank_log_file}
+            test_exit_code=${PIPESTATUS[0]}
         fi
-        if [ $? -ne 0 ]; then
+        if [ "$test_exit_code" -ne 0 ]; then
             echo "Error: Test ${TEST_NAME} failed, see ${rank_err_file} for details" >&2
-            return $?
+            return "$test_exit_code"
         fi
     done
 
@@ -232,11 +232,18 @@ export {{ k }}="{{ v }}"
 {{ [launcher, "-np $SLURM_JOB_NUM_NODES --map-by ppr:1:node", pyxis_params] | reject('equalto', '') | join(" ") }} bash -c "get_nvl_domain_info"
 {{ [launcher, "-np 1 --map-by ppr:1:node", pyxis_params] | reject('equalto', '') | join(" ") }} bash -c "validate_running_environment && collect_sweep_metadata && collect_test_set_metadata"
 {% endif %}
-[ $? -ne 0 ] && { echo "Error: Failed to validate running environment"; exit 1; }
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to validate running environment" >&2
+    echo "Cleaning up incomplete results directory: ${LOG_DIR}" >&2
+    rm -rf -- "${LOG_DIR}"
+    rmdir -- "${SWEEP_LOG_DIR}" 2>/dev/null || true
+    exit 1
+fi
 
 export MAX_GPUS_IN_NVL_DOMAIN=$(grep "ClusterUUID" $LOG_DIR/nvl_domain_info/rank_*.txt | awk '{print $NF}' | sort | uniq -c | sort -nr | awk '{print $1}' | head -n1 || echo "null")
 
 testset_iterations={{ testset.testset_iterations }}
+overall_ret_code=0
 
 for testset_iter in $(seq 1 ${testset_iterations}); do
 {% set ns = namespace(global_index=0, total_tests=0) %}
@@ -250,7 +257,7 @@ for testset_iter in $(seq 1 ${testset_iterations}); do
         {% set combination_args %}{% for k, v in combination.arg.items() %}{{ k }}{{ v }}{% if not loop.last %} {% endif %}{% endfor %}{% endset %}
         {% set pre_cmd %}{% if combination.custom_commands.pre_command is defined %}{{ combination.custom_commands.pre_command }}{% endif %}{% endset %}
         {% set post_cmd %}{% if combination.custom_commands.post_command is defined %}{{ combination.custom_commands.post_command }}{% endif %}{% endset %}
-        {% set test_cmd %}{{ [launcher, launcher_params, pyxis_params, library_envs, combination_envs] | reject('equalto', '') | join(" ") }} bash -c '{% if pre_cmd %}{{ pre_cmd }}; {% endif %}{{ ["run_test", test.binary + "${NVCOMMS_PERF_TOOLS_BINARY_SUFFIX}", combination_args] | reject('equalto', '') | join(" ") }}{% if post_cmd %}; {{ post_cmd }}{% endif %}'{% endset %}
+        {% set test_cmd %}{{ [launcher, launcher_params, pyxis_params, library_envs, combination_envs] | reject('equalto', '') | join(" ") }} bash -c '{% if pre_cmd %}{{ pre_cmd }}; {% endif %}{{ ["run_test", test.binary + "${NVCOMMS_PERF_TOOLS_BINARY_SUFFIX}", combination_args] | reject('equalto', '') | join(" ") }}; run_test_status=$?{% if post_cmd %}; {{ post_cmd }}; post_command_status=$?{% else %}; post_command_status=0{% endif %}; if [ "$run_test_status" -ne 0 ]; then exit "$run_test_status"; fi; exit "$post_command_status"'{% endset %}
     echo "[${testset_iter}/${testset_iterations}] Running test {{ ns.global_index }}/{{ ns.total_tests }}"
     export TEST_NAME={{ test.name }} TESTSET_ITERATION=${testset_iter} USE_DEFAULT_PARAM={{ 1 if testset.use_default_params else 0 }}
     export STEP_NAME="${TESTSET_ITERATION}_{{ns.global_index}}_LOG_${TEST_NAME}_env{{ combination.env_combo_index }}_args{{ combination.arg_combo_index }}_job${SLURM_JOB_ID}"
@@ -261,6 +268,12 @@ for testset_iter in $(seq 1 ${testset_iterations}); do
     {{ test_cmd }} > >(tee "${LOG_DIR}"/"${STEP_NAME}"/job_step_stdout.txt) 2> >(tee "${LOG_DIR}"/"${STEP_NAME}"/job_step_stderr.txt)
     ret_code=$?
     end_time=$(date +%s.%N)
+
+    if [ "$ret_code" != "0" ]; then
+        echo "ERROR: Test ${TEST_NAME} failed with exit code ${ret_code}" >&2
+        echo "  See: ${LOG_DIR}/${STEP_NAME}/job_step_stderr.txt" >&2
+        overall_ret_code=1
+    fi
 
     cat > "${LOG_DIR}"/"${STEP_NAME}"/result.txt << EOF
 test_name="${TEST_NAME}"
@@ -276,7 +289,11 @@ EOF
 done
 
 # Cleanup and completion
-echo "All tests completed successfully"
+if [ "$overall_ret_code" != "0" ]; then
+    echo "Some tests failed (see errors above)"
+else
+    echo "All tests completed successfully"
+fi
 
 {% if user.epilogue_commands %}
 # User Epilogue Commands
@@ -313,7 +330,7 @@ tar -czf ${SWEEP_LOG_DIR}.tar.gz ${SWEEP_LOG_DIR}
 
 echo "All done"
 
-exit 0
+exit $overall_ret_code
 
 {% if append_config_contents %}
 ########## Configurations ##########
